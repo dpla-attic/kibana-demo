@@ -1,0 +1,175 @@
+---
+
+- hosts: all
+  become: yes
+
+  vars:
+    log_put_body: >-
+      {
+          "mappings": {
+              "events": {
+                  "properties": {
+                      "timestamp": {
+                          "type": "date"
+                      },
+                      "host": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "syslogtag": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "programname": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "severity": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "facility": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "message": {
+                          "type": "string"
+                      }
+                  }
+              }
+          }
+      }
+
+  tasks:
+
+    - name: Install Java 7 runtime
+      apt:
+        pkg: openjdk-7-jre
+        state: present
+
+    - name: Check whether Elasticsearch is installed
+      command: dpkg -s elasticsearch
+      register: dpkg_test
+      ignore_errors: yes
+
+    - name: Download Elasticsearch package
+      get_url:
+        url: https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.3.3/elasticsearch-2.3.3.deb
+        dest: /tmp/elasticsearch-2.3.3.deb
+      when: "'Version: 2.3.3' not in dpkg_test.stdout"
+
+    - name: Remove old Elasticsearch package
+      command: dpkg --remove elasticsearch
+      when: "'Version: 2.3.3' not in dpkg_test.stdout"
+
+    - name: Install Elasticsearch package
+      command: dpkg -i -E --force-confnew /tmp/elasticsearch-2.3.3.deb
+      when: "'Version: 2.3.3' not in dpkg_test.stdout"
+      notify: restart elasticsearch
+
+    - name: Ensure init script run levels
+      command: update-rc.d elasticsearch defaults
+
+    - name: Ensure state of Elasticsearch config file
+      template:
+        src: templates/elasticsearch.yml.j2
+        dest: /etc/elasticsearch/elasticsearch.yml
+      notify: restart elasticsearch
+
+    - meta: flush_handlers
+
+    - name: Wait for Elasticsearch to respond
+      local_action: wait_for host=localhost port=9200 delay=5 timeout=60
+      become: no
+
+    # FIXME: this always fails when a VM is initially provisioned, but
+    # succeeds if you run `vagrant provision` afterwards.
+    - name: Ensure that Elasticsearch log index exists
+      local_action: >-
+        command curl -X PUT "http://localhost:9200/log" -d '{{ log_put_body }}'
+      become: no
+
+  handlers:
+    - name: restart elasticsearch
+      service: name=elasticsearch state=restarted
+
+- hosts: all
+  become: yes
+
+  tasks:
+
+    - name: Add Adiscon repository for rsyslog
+      apt_repository: repo='ppa:adiscon/v8-stable'
+
+    - name: Ensure that rsyslog and its ES plugin are installed
+      apt: >-
+        pkg="{{ item }}" state=latest update_cache=yes force=yes
+      with_items:
+        - rsyslog
+        - rsyslog-elasticsearch
+      notify: restart rsyslog
+
+    - name: Ensure state of rsyslog main config file
+      template:
+        src: files/rsyslog.conf
+        dest: /etc/rsyslog.conf
+      notify: restart rsyslog
+
+    - name: Ensure state of rsyslog elasticsearch module file
+      template:
+        src: templates/55-elasticsearch.conf.j2
+        dest: /etc/rsyslog.d/55-elasticsearch.conf
+      notify: restart rsyslog
+
+    - name: Ensure that unneeded packages are absent
+      apt: >-
+        pkg="{{ item }}" state=absent purge=yes
+      with_items:
+        - puppet
+        - pppoeconf
+        - ppp
+        - chef
+
+  handlers:
+    - name: restart rsyslog
+      service: name=rsyslog state=restarted
+
+- hosts: all
+  become: yes
+  tasks:
+
+    - name: Check whether Kibana is installed
+      command: dpkg -s kibana
+      register: dpkg_test
+      ignore_errors: yes
+
+    - name: Download Kibana package
+      get_url:
+        url: https://download.elastic.co/kibana/kibana/kibana_4.5.1_amd64.deb
+        dest: /tmp/kibana_4.5.1_amd64.deb
+      when: "'Version: 4.5.1' not in dpkg_test.stdout"
+
+    - name: Remove old Kibana package
+      command: dpkg --remove elasticsearch
+      when: "'Version: 4.5.1' not in dpkg_test.stdout"
+
+    - name: Install Kibana package
+      command: dpkg -i -E --force-confnew /tmp/kibana_4.5.1_amd64.deb
+      when: "'Version: 4.5.1' not in dpkg_test.stdout"
+      notify: restart kibana
+
+    - name: Ensure init script run levels
+      command: update-rc.d kibana defaults
+
+    - name: Ensure state of Kibana config file
+      template:
+        src: templates/kibana.yml.j2
+        dest: /opt/kibana/config/kibana.yml
+      notify: restart kibana
+
+  handlers:
+    - name: restart kibana
+      service: name=kibana state=restarted
+
+# You should now be able to see Kibana at http://localhost:5601/
+
