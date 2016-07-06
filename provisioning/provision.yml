@@ -49,22 +49,22 @@
 
     - name: Check whether Elasticsearch is installed
       command: dpkg -s elasticsearch
-      register: dpkg_test
+      register: es_dpkg_test
       ignore_errors: yes
 
     - name: Download Elasticsearch package
       get_url:
         url: https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.3.3/elasticsearch-2.3.3.deb
         dest: /tmp/elasticsearch-2.3.3.deb
-      when: "'Version: 2.3.3' not in dpkg_test.stdout"
+      when: "'Version: 2.3.3' not in es_dpkg_test.stdout"
 
     - name: Remove old Elasticsearch package
       command: dpkg --remove elasticsearch
-      when: "'Version: 2.3.3' not in dpkg_test.stdout"
+      when: "'Version: 2.3.3' not in es_dpkg_test.stdout"
 
     - name: Install Elasticsearch package
       command: dpkg -i -E --force-confnew /tmp/elasticsearch-2.3.3.deb
-      when: "'Version: 2.3.3' not in dpkg_test.stdout"
+      when: "'Version: 2.3.3' not in es_dpkg_test.stdout"
       notify: restart elasticsearch
 
     - name: Ensure init script run levels
@@ -140,22 +140,22 @@
 
     - name: Check whether Kibana is installed
       command: dpkg -s kibana
-      register: dpkg_test
+      register: k_dpkg_test
       ignore_errors: yes
 
     - name: Download Kibana package
       get_url:
         url: https://download.elastic.co/kibana/kibana/kibana_4.5.1_amd64.deb
         dest: /tmp/kibana_4.5.1_amd64.deb
-      when: "'Version: 4.5.1' not in dpkg_test.stdout"
+      when: "'Version: 4.5.1' not in k_dpkg_test.stdout"
 
     - name: Remove old Kibana package
       command: dpkg --remove elasticsearch
-      when: "'Version: 4.5.1' not in dpkg_test.stdout"
+      when: "'Version: 4.5.1' not in k_dpkg_test.stdout"
 
     - name: Install Kibana package
       command: dpkg -i -E --force-confnew /tmp/kibana_4.5.1_amd64.deb
-      when: "'Version: 4.5.1' not in dpkg_test.stdout"
+      when: "'Version: 4.5.1' not in k_dpkg_test.stdout"
       notify: restart kibana
 
     - name: Ensure init script run levels
