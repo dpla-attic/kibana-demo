@@ -1,4 +1,5 @@
 module(load="omelasticsearch")
+module(load="imfile" mode="inotify")
 
 template(name="json-syslog" type="list" option.json="on") {
 
@@ -35,16 +36,40 @@ template(name="json-syslog" type="list" option.json="on") {
     constant(value="}")
 }
 
-action(
-    type="omelasticsearch"
-    server="192.168.50.20"
-    serverport="9200"
-    template="json-syslog"
-    searchIndex="log"
-    searchType="events"
-    bulkmode="on"
-    queue.type="linkedlist"
-    queue.size="5000"
-    queue.dequeuebatchsize="300"
-    action.resumeretrycount="-1"
-)
+action(type="omelasticsearch"
+       server="192.168.50.20"
+       serverport="9200"
+       template="json-syslog"
+       searchIndex="log"
+       searchType="events"
+       bulkmode="on"
+       queue.type="linkedlist"
+       queue.size="5000"
+       queue.dequeuebatchsize="300"
+       action.resumeretrycount="-1")
+
+
+# Here's an example of rsyslog tailing a log file.  The severity is fixed,
+# because the logfile lines are not parsed.  We don't have any applications that
+# I can think of that can't log directly to syslog (and specify the severity of
+# each message), so this probably won't be necessary.
+
+ruleset(name="testlog") {
+    action(type="omelasticsearch"
+           server="192.168.50.20"
+           serverport="9200"
+           template="json-syslog"
+           searchIndex="log"
+           searchType="events"
+           bulkmode="on"
+           queue.type="linkedlist"
+           queue.size="5000"
+           queue.dequeuebatchsize="300"
+           action.resumeretrycount="-1")
+}
+
+input(type="imfile"
+      file="/var/tmp/testlog"
+      tag="testlog"
+      facility="local7"
+      ruleset="testlog")
