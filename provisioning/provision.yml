@@ -7,7 +7,7 @@
     log_put_body: >-
       {
           "mappings": {
-              "events": {
+              "event": {
                   "properties": {
                       "timestamp": {
                           "type": "date"
