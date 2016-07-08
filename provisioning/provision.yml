@@ -84,10 +84,14 @@
 
     # FIXME: this always fails when a VM is initially provisioned, but
     # succeeds if you run `vagrant provision` afterwards.
-    - name: Ensure that Elasticsearch log index exists
+    - name: Ensure that Elasticsearch log indices exist
       local_action: >-
-        command curl -X PUT "http://localhost:9200/log" -d '{{ log_put_body }}'
+        command curl -X PUT "http://localhost:9200/{{ item }}"
+                     -d '{{ log_put_body }}'
       become: no
+      with_items:
+        - log-general
+        - log-sensitive
 
   handlers:
     - name: restart elasticsearch

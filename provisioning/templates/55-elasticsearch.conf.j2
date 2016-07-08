@@ -36,11 +36,16 @@ template(name="json-syslog" type="list" option.json="on") {
     constant(value="}")
 }
 
+# Events of different facilities can be segregated into separate indices, for
+# security.  Elastic Shield can be used with Elasticsearch to restrict access
+# to sensitive information to certain users or roles.
+
+*.*;auth,authpriv.none;mail.none
 action(type="omelasticsearch"
        server="192.168.50.20"
        serverport="9200"
        template="json-syslog"
-       searchIndex="log"
+       searchIndex="log-general"
        searchType="events"
        bulkmode="on"
        queue.type="linkedlist"
@@ -48,6 +53,18 @@ action(type="omelasticsearch"
        queue.dequeuebatchsize="300"
        action.resumeretrycount="-1")
 
+auth,authpriv.*;mail.*
+action(type="omelasticsearch"
+       server="192.168.50.20"
+       serverport="9200"
+       template="json-syslog"
+       searchIndex="log-sensitive"
+       searchType="events"
+       bulkmode="on"
+       queue.type="linkedlist"
+       queue.size="5000"
+       queue.dequeuebatchsize="300"
+       action.resumeretrycount="-1")
 
 # Here's an example of rsyslog tailing a log file.  The severity is fixed,
 # because the logfile lines are not parsed.  We don't have any applications that
@@ -59,7 +76,7 @@ ruleset(name="testlog") {
            server="192.168.50.20"
            serverport="9200"
            template="json-syslog"
-           searchIndex="log"
+           searchIndex="log-general"
            searchType="events"
            bulkmode="on"
            queue.type="linkedlist"
@@ -67,7 +84,6 @@ ruleset(name="testlog") {
            queue.dequeuebatchsize="300"
            action.resumeretrycount="-1")
 }
-
 input(type="imfile"
       file="/var/tmp/testlog"
       tag="testlog"
