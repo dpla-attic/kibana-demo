@@ -6,6 +6,10 @@
   vars:
     log_put_body: >-
       {
+          "template": "log-*",
+          "settings": {
+            "number_of_shards": 1
+          },
           "mappings": {
               "event": {
                   "properties": {
@@ -46,6 +50,7 @@
       apt:
         pkg: openjdk-7-jre
         state: present
+        update_cache: yes
 
     - name: Check whether Elasticsearch is installed
       command: dpkg -s elasticsearch
@@ -56,15 +61,17 @@
       get_url:
         url: https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.3.3/elasticsearch-2.3.3.deb
         dest: /tmp/elasticsearch-2.3.3.deb
-      when: "'Version: 2.3.3' not in es_dpkg_test.stdout"
+      when: es_dpkg_test.rc != 0
+      # In production, we'd want to check the installed version number and
+      # remove an old version if it exists.
 
     - name: Remove old Elasticsearch package
       command: dpkg --remove elasticsearch
-      when: "'Version: 2.3.3' not in es_dpkg_test.stdout"
+      when: es_dpkg_test.rc != 0
 
     - name: Install Elasticsearch package
       command: dpkg -i -E --force-confnew /tmp/elasticsearch-2.3.3.deb
-      when: "'Version: 2.3.3' not in es_dpkg_test.stdout"
+      when: es_dpkg_test.rc != 0
       notify: restart elasticsearch
 
     - name: Ensure init script run levels
@@ -79,19 +86,14 @@
     - meta: flush_handlers
 
     - name: Wait for Elasticsearch to respond
-      local_action: wait_for host=localhost port=9200 delay=5 timeout=60
+      local_action: wait_for host=localhost port=9200 delay=10 timeout=60
       become: no
 
-    # FIXME: this always fails when a VM is initially provisioned, but
-    # succeeds if you run `vagrant provision` afterwards.
-    - name: Ensure that Elasticsearch log indices exist
+    - name: Set Elasticsearch Index Template
       local_action: >-
-        command curl -X PUT "http://localhost:9200/{{ item }}"
+        command curl -X PUT "http://localhost:9200/_template/logs"
                      -d '{{ log_put_body }}'
       become: no
-      with_items:
-        - log-general
-        - log-sensitive
 
   handlers:
     - name: restart elasticsearch
@@ -151,15 +153,11 @@
       get_url:
         url: https://download.elastic.co/kibana/kibana/kibana_4.5.1_amd64.deb
         dest: /tmp/kibana_4.5.1_amd64.deb
-      when: "'Version: 4.5.1' not in k_dpkg_test.stdout"
-
-    - name: Remove old Kibana package
-      command: dpkg --remove elasticsearch
-      when: "'Version: 4.5.1' not in k_dpkg_test.stdout"
+      when: k_dpkg_test.rc != 0
 
     - name: Install Kibana package
       command: dpkg -i -E --force-confnew /tmp/kibana_4.5.1_amd64.deb
-      when: "'Version: 4.5.1' not in k_dpkg_test.stdout"
+      when: k_dpkg_test.rc != 0
       notify: restart kibana
 
     - name: Ensure init script run levels

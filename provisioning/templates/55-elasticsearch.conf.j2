@@ -36,6 +36,15 @@ template(name="json-syslog" type="list" option.json="on") {
     constant(value="}")
 }
 
+# Templates for search index names below in omelasticsearch actions.
+#
+template(name="log-general-days"
+         type="string"
+         string="log-general-%timereported:1:10:date-rfc3339%")
+template(name="log-sensitive-days"
+         type="string"
+         string="log-sensitive-%timereported:1:10:date-rfc3339%")
+
 # Events of different facilities can be segregated into separate indices, for
 # security.  Elastic Shield can be used with Elasticsearch to restrict access
 # to sensitive information to certain users or roles.
@@ -45,7 +54,8 @@ action(type="omelasticsearch"
        server="192.168.50.20"
        serverport="9200"
        template="json-syslog"
-       searchIndex="log-general"
+       searchIndex="log-general-days"
+       dynSearchIndex="on"
        searchType="event"
        bulkmode="on"
        queue.type="linkedlist"
@@ -58,7 +68,8 @@ action(type="omelasticsearch"
        server="192.168.50.20"
        serverport="9200"
        template="json-syslog"
-       searchIndex="log-sensitive"
+       searchIndex="log-sensitive-days"
+       dynSearchIndex="on"
        searchType="event"
        bulkmode="on"
        queue.type="linkedlist"
