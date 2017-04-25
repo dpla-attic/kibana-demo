@@ -6,7 +6,7 @@ Vagrant.configure(2) do |config|
     logtest.vm.network "forwarded_port", guest: 9200, host: 9200
     logtest.vm.network "forwarded_port", guest: 5601, host: 5601
     logtest.vm.provider 'virtualbox' do |vb|
-      vb.memory = 1024
+      vb.memory = 1536
     end
     logtest.vm.provision 'ansible' do |ansible|
       ansible.playbook = 'provisioning/provision.yml'

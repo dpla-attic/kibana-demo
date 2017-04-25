@@ -4,7 +4,8 @@
   become: yes
 
   vars:
-    log_put_body: >-
+
+    rsyslog_log_put_body: >-
       {
           "template": "log-*",
           "settings": {
@@ -37,6 +38,64 @@
                           "index": "not_analyzed"
                       },
                       "message": {
+                          "type": "string"
+                      }
+                  }
+              }
+          }
+      }
+
+    logstash_log_put_body: >-
+      {
+          "template": "logstash-*",
+          "settings": {
+              "number_of_shards": 1
+          },
+          "mappings": {
+              "logs": {
+                  "properties": {
+                      "@timestamp": {
+                          "type": "date"
+                      },
+                      "timestamp": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "host": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "logsource": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "program": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "facility": {
+                          "type": "long"
+                      }
+                      "facility_label": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "severity": {
+                          "type": "long"
+                      }
+                      "severity_label": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "pid": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "@version": {
+                          "type": "string",
+                          "index": "not_analyzed"
+                      },
+                      "filename": {
                           "type": "string"
                       }
                   }
@@ -89,10 +148,16 @@
       local_action: wait_for host=localhost port=9200 delay=10 timeout=60
       become: no
 
-    - name: Set Elasticsearch Index Template
+    - name: Set Elasticsearch Index Template (direct Rsyslog index)
       local_action: >-
-        command curl -X PUT "http://localhost:9200/_template/logs"
-                     -d '{{ log_put_body }}'
+        command curl -X PUT "http://localhost:9200/_template/rsysloglogs"
+                     -d '{{ rsyslog_log_put_body }}'
+      become: no
+
+    - name: Set Elasticsearch Index Template (Logstash index)
+      local_action: >-
+        command curl -X PUT "http://localhost:9200/_template/logstashlogs"
+                     -d '{{ logstash_log_put_body }}'
       become: no
 
   handlers:
@@ -119,6 +184,12 @@
       template:
         src: files/rsyslog.conf
         dest: /etc/rsyslog.conf
+      notify: restart rsyslog
+
+    - name: Ensure state of rsyslog default configuration file
+      template:
+        src: templates/50-default.conf.j2
+        dest: /etc/rsyslog.d/50-default.conf
       notify: restart rsyslog
 
     - name: Ensure state of rsyslog elasticsearch module file
@@ -175,3 +246,32 @@
 
 # You should now be able to see Kibana at http://localhost:5601/
 
+- hosts: all
+  become: yes
+  tasks:
+
+    - name: Add Logstash APT repository
+      apt_repository:
+        repo: 'deb https://packages.elastic.co/logstash/2.4/debian stable main'
+
+    - name: Ensure that Logstash is installed
+      apt: pkg=logstash state=present update_cache=yes force=yes
+      notify: restart logstash
+
+    - name: Ensure state of syslog pipeline config file
+      template:
+        src: templates/syslog-pipeline.conf.j2
+        dest: /etc/logstash/conf.d/syslog-pipeline.conf
+      notify: restart logstash
+      tags:
+        - pipeline
+
+  handlers:
+    - name: restart logstash
+      service: name=logstash state=restarted
+
+# Now with that Logstash setup, you should be able to use a utility like
+# `logger(1)' to send a syslog message from your host environment to your
+# VM, so that it gets parsed and inserted into Elasticsearch for Kibana to find.
+# Example, on my host:
+# $ logger -s -r 192.168.50.20 -l local0.info "Test message"

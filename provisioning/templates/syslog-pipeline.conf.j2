@@ -1,0 +1,42 @@
+input {
+    syslog {
+        host => "192.168.50.20"
+        port => 1514
+    }
+}
+
+filter {
+
+    # If the syslog tag (`program' property) is "test1" then parse the
+    # square-bracketed tags in the `message' field
+
+    if [program] == "test1" {
+        grok {
+            match => {
+                "message" => "\[%{DATA:filename}\] %{GREEDYDATA:message}"
+            }
+            overwrite => [ "message" ]
+        }
+    }
+
+    # If the `program' property is "test2" then try this other pattern:
+    if [program] == "test2" {
+        grok {
+            match => {
+                "message" => "\[%{DATA:filename}\] \[%{NUMBER:pid}\] %{GREEDYDATA:message}"
+            }
+            overwrite => [ "message" ]
+        }
+    }
+
+    mutate {
+        strip => ["message"]
+    }
+
+}
+
+output {
+    elasticsearch {
+        hosts => [ "192.168.50.20:9200" ]
+    }
+}

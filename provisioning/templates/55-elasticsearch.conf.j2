@@ -49,34 +49,40 @@ template(name="log-sensitive-days"
 # security.  Elastic Shield can be used with Elasticsearch to restrict access
 # to sensitive information to certain users or roles.
 
-*.*;auth,authpriv.none;mail.none
-action(type="omelasticsearch"
-       server="192.168.50.20"
-       serverport="9200"
-       template="json-syslog"
-       searchIndex="log-general-days"
-       dynSearchIndex="on"
-       searchType="event"
-       bulkmode="on"
-       queue.type="linkedlist"
-       queue.size="5000"
-       queue.dequeuebatchsize="300"
-       action.resumeretrycount="-1")
 
-auth,authpriv.*;mail.*
-action(type="omelasticsearch"
-       server="192.168.50.20"
-       serverport="9200"
-       template="json-syslog"
-       searchIndex="log-sensitive-days"
-       dynSearchIndex="on"
-       searchType="event"
-       bulkmode="on"
-       queue.type="linkedlist"
-       queue.size="5000"
-       queue.dequeuebatchsize="300"
-       action.resumeretrycount="-1")
-
+# Uncomment the following lines to see how Rsyslog can ship directly to
+# Elasticsearch, without going through Logstash.  This is the first method
+# I tried out, but now I have messages going through Logstash in
+# 50-default.conf.j2. --mb
+#
+# *.*;auth,authpriv.none;mail.none
+# action(type="omelasticsearch"
+#        server="192.168.50.20"
+#        serverport="9200"
+#        template="json-syslog"
+#        searchIndex="log-general-days"
+#        dynSearchIndex="on"
+#        searchType="event"
+#        bulkmode="on"
+#        queue.type="linkedlist"
+#        queue.size="5000"
+#        queue.dequeuebatchsize="300"
+#        action.resumeretrycount="-1")
+#
+# auth,authpriv.*;mail.*
+# action(type="omelasticsearch"
+#        server="192.168.50.20"
+#        serverport="9200"
+#        template="json-syslog"
+#        searchIndex="log-sensitive-days"
+#        dynSearchIndex="on"
+#        searchType="event"
+#        bulkmode="on"
+#        queue.type="linkedlist"
+#        queue.size="5000"
+#        queue.dequeuebatchsize="300"
+#        action.resumeretrycount="-1")
+#
 # Here's an example of rsyslog tailing a log file.  The severity is fixed,
 # because the logfile lines are not parsed.  We don't have any applications that
 # I can think of that can't log directly to syslog (and specify the severity of
