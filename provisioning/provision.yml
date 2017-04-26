@@ -263,7 +263,6 @@
     - name: restart kibana
       service: name=kibana state=restarted
 
-# You should now be able to see Kibana at http://192.168.50.20:5601/
 
 - name: Logstash
   hosts: all
@@ -292,9 +291,3 @@
   handlers:
     - name: restart logstash
       service: name=logstash state=restarted
-
-# Now with that Logstash setup, you should be able to use a utility like
-# `logger(1)' to send a syslog message from your host environment to your
-# VM, so that it gets parsed and inserted into Elasticsearch for Kibana to find.
-# Example, on my host:
-# $ logger -s -r 192.168.50.20 -l local0.info "Test message"

@@ -8,10 +8,10 @@ centralizing our system and application logging.
 
 The ELK stack software versions match those that are currently supported by AWS.
 
-Elasticsearch: 5.1.x
-Kibana: 5.1.x
-Logstash: 5.1.x
-Rsyslog: 8.26.0 (latest available, adiscon/v4-stable repo)
+* Elasticsearch: 5.1.x
+* Kibana: 5.1.x
+* Logstash: 5.1.x
+* Rsyslog: 8.26.0 (latest available, adiscon/v4-stable repo)
 
 ## Installation
 
