@@ -1,9 +1,25 @@
 ---
 
-- hosts: all
+- name: Python preliminaries
+  hosts: all
+  gather_facts: false
+  become: yes
+  tasks:
+    - name: Upate apt repos
+      # "raw" because python 2.7 may not be installed yet
+      raw: apt-get update -qq
+
+    - name: Ensure that Python 2.7 is installed for Ansible
+      raw: apt-get install -qq python2.7
+
+
+- name: Java and Elasticsearch
+  hosts: all
   become: yes
 
   vars:
+    ansible_python_interpreter: /usr/bin/python2.7
+    es_heap_size: 500m
 
     rsyslog_log_put_body: >-
       {
@@ -105,58 +121,62 @@
 
   tasks:
 
-    - name: Install Java 7 runtime
+    - name: Install Java 8 runtime
       apt:
-        pkg: openjdk-7-jre
+        pkg: openjdk-8-jre
         state: present
         update_cache: yes
 
-    - name: Check whether Elasticsearch is installed
-      command: dpkg -s elasticsearch
-      register: es_dpkg_test
-      ignore_errors: yes
+    - name: Install Elastic signing key
+      shell: >-
+        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch |
+        sudo apt-key add -
 
-    - name: Download Elasticsearch package
-      get_url:
-        url: https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.3.3/elasticsearch-2.3.3.deb
-        dest: /tmp/elasticsearch-2.3.3.deb
-      when: es_dpkg_test.rc != 0
-      # In production, we'd want to check the installed version number and
-      # remove an old version if it exists.
+    - name: Add Elastic repository for all Elastic Stack packages
+      apt_repository:
+        repo: "deb https://artifacts.elastic.co/packages/5.x/apt stable main"
+        state: present
 
-    - name: Remove old Elasticsearch package
-      command: dpkg --remove elasticsearch
-      when: es_dpkg_test.rc != 0
-
-    - name: Install Elasticsearch package
-      command: dpkg -i -E --force-confnew /tmp/elasticsearch-2.3.3.deb
-      when: es_dpkg_test.rc != 0
+    - name: Ensure installation of Elasticsearch
+      apt:
+        pkg: "elasticsearch=5.1.2"
+        update_cache: yes
+        state: present
       notify: restart elasticsearch
 
-    - name: Ensure init script run levels
-      command: update-rc.d elasticsearch defaults
-
-    - name: Ensure state of Elasticsearch config file
+    - name: Ensure state of Elasticsearch configuration file
       template:
         src: templates/elasticsearch.yml.j2
         dest: /etc/elasticsearch/elasticsearch.yml
+        owner: root
+        group: elasticsearch
+        mode: 0660
+      notify: restart elasticsearch
+
+    - name: Ensure state of jvm.options file
+      template:
+        src: templates/jvm.options.j2
+        dest: /etc/elasticsearch/jvm.options
+        owner: root
+        group: elasticsearch
+        mode: 0660
       notify: restart elasticsearch
 
     - meta: flush_handlers
 
     - name: Wait for Elasticsearch to respond
-      local_action: wait_for host=localhost port=9200 delay=10 timeout=60
+      local_action: wait_for host=192.168.50.20 port=9200 delay=10 timeout=60
       become: no
 
     - name: Set Elasticsearch Index Template (direct Rsyslog index)
       local_action: >-
-        command curl -X PUT "http://localhost:9200/_template/rsysloglogs"
+        command curl -X PUT "http://192.168.50.20:9200/_template/rsysloglogs"
                      -d '{{ rsyslog_log_put_body }}'
       become: no
 
     - name: Set Elasticsearch Index Template (Logstash index)
       local_action: >-
-        command curl -X PUT "http://localhost:9200/_template/logstashlogs"
+        command curl -X PUT "http://192.168.50.20:9200/_template/logstashlogs"
                      -d '{{ logstash_log_put_body }}'
       become: no
 
@@ -164,8 +184,14 @@
     - name: restart elasticsearch
       service: name=elasticsearch state=restarted
 
-- hosts: all
+
+
+- name: Rsyslog
+  hosts: all
   become: yes
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python2.7
 
   tasks:
 
@@ -211,51 +237,48 @@
     - name: restart rsyslog
       service: name=rsyslog state=restarted
 
-- hosts: all
+- name: Kibana
+  hosts: all
   become: yes
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python2.7
+
   tasks:
 
-    - name: Check whether Kibana is installed
-      command: dpkg -s kibana
-      register: k_dpkg_test
-      ignore_errors: yes
-
-    - name: Download Kibana package
-      get_url:
-        url: https://download.elastic.co/kibana/kibana/kibana_4.5.1_amd64.deb
-        dest: /tmp/kibana_4.5.1_amd64.deb
-      when: k_dpkg_test.rc != 0
-
-    - name: Install Kibana package
-      command: dpkg -i -E --force-confnew /tmp/kibana_4.5.1_amd64.deb
-      when: k_dpkg_test.rc != 0
+    - name: Ensure installation of Kibana
+      apt:
+        pkg: "kibana=5.1.2"
+        update_cache: yes
+        state: present
       notify: restart kibana
-
-    - name: Ensure init script run levels
-      command: update-rc.d kibana defaults
 
     - name: Ensure state of Kibana config file
       template:
         src: templates/kibana.yml.j2
-        dest: /opt/kibana/config/kibana.yml
+        dest: /etc/kibana/kibana.yml
       notify: restart kibana
 
   handlers:
     - name: restart kibana
       service: name=kibana state=restarted
 
-# You should now be able to see Kibana at http://localhost:5601/
+# You should now be able to see Kibana at http://192.168.50.20:5601/
 
-- hosts: all
+- name: Logstash
+  hosts: all
   become: yes
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python2.7
+
   tasks:
 
-    - name: Add Logstash APT repository
-      apt_repository:
-        repo: 'deb https://packages.elastic.co/logstash/2.4/debian stable main'
-
-    - name: Ensure that Logstash is installed
-      apt: pkg=logstash state=present update_cache=yes force=yes
+    - name: Ensure installation of Logstash
+      apt:
+        pkg: "logstash=1:5.1.2-1"
+        update_cache: yes
+        state: present
       notify: restart logstash
 
     - name: Ensure state of syslog pipeline config file
