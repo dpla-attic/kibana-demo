@@ -132,6 +132,16 @@
         wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch |
         sudo apt-key add -
 
+    # FIXME: Change this file to download specific packages and install them.
+    # This repository is not "stable"!  Note how it's for "5.x", which will
+    # contain packages for different minor version numbers. The way Elastic
+    # releases minor versions, there have changes to configuration files across
+    # versions, which have invalidated options in our custom configuration
+    # files when option names have been changed. Having all of their packages
+    # in a "5.x" repository means that an `aptitude safe-upgrade` that's done
+    # in the course of applying security patches for the rest of the o/s could
+    # pull the next minor version of ELK. We've had this happen between 5.1.2
+    # and 5.4.1, for example.
     - name: Add Elastic repository for all Elastic Stack packages
       apt_repository:
         repo: "deb https://artifacts.elastic.co/packages/5.x/apt stable main"
@@ -139,7 +149,7 @@
 
     - name: Ensure installation of Elasticsearch
       apt:
-        pkg: "elasticsearch=5.1.2"
+        pkg: "elasticsearch=5.4.1"
         update_cache: yes
         state: present
       notify: restart elasticsearch
@@ -248,7 +258,7 @@
 
     - name: Ensure installation of Kibana
       apt:
-        pkg: "kibana=5.1.2"
+        pkg: "kibana=5.4.1"
         update_cache: yes
         state: present
       notify: restart kibana
@@ -275,7 +285,7 @@
 
     - name: Ensure installation of Logstash
       apt:
-        pkg: "logstash=1:5.1.2-1"
+        pkg: "logstash=1:5.4.1-1"
         update_cache: yes
         state: present
       notify: restart logstash
